@@ -1,0 +1,81 @@
+#include "mbed.h"
+#include "BufferedSerial.h"
+
+BufferedSerial pc(USBTX, USBRX); // Serial interface for debugging
+BufferedSerial bt(ARDUINO_UNO_D1, ARDUINO_UNO_D0); // HC-05 module connected to pins D1 (TX) and D0 (RX)
+DigitalOut led(LED1); // LED connected to pin LED1
+PwmOut Buzzer(ARDUINO_UNO_A0);
+DigitalIn btState(ARDUINO_UNO_D13);
+DigitalOut dcmotor(ARDUINO_UNO_D3);
+
+//RGB LED Class System
+//===========================================================================================
+class RGBLED
+{
+public:
+    RGBLED(PinName redLpin, PinName greenLpin, PinName blueLpin);
+    void write(float red,float green, float blue);
+private:
+    PwmOut _redLpin;
+    PwmOut _greenLpin;
+    PwmOut _blueLpin;
+};
+
+RGBLED::RGBLED (PinName redLpin, PinName greenLpin, PinName blueLpin)
+    : _redLpin(redLpin), _greenLpin(greenLpin), _blueLpin(blueLpin)
+{
+    //2000Hz 
+    _redLpin.period(0.0005);
+}
+
+void RGBLED::write(float red,float green, float blue)
+{
+    _redLpin = red;
+    _greenLpin = green;
+    _blueLpin = blue;
+}
+
+//Setup RGB led using PWM pins and class
+RGBLED myRGBLED(D11,D10,D9); //RGB PWM pins
+//===============================================================================================
+
+void siren(){
+    int i;
+    for (i = 0; i < 4; i = i + 2)
+    {
+        dcmotor=1;
+        Buzzer.period(1.0 / 969.0);
+        Buzzer = float(i) / 50.0;
+        ThisThread::sleep_for(500ms);
+        dcmotor=0;
+        Buzzer.period(1.0 / 800.0);
+        ThisThread::sleep_for(500ms);
+    }
+}
+
+void warning(){
+    siren();
+}
+
+void offstate(){
+        Buzzer = 0;
+        myRGBLED.write(0.0,0.0,1.0); // Set RGB LED to green
+        ThisThread::sleep_for(500ms);
+}
+
+int main() {
+    pc.set_baud(9600); // Set the baud rate for debugging
+    bt.set_baud(9600); // Set the baud rate for the HC-05 module
+    led = 1; // Turn off the LED initially
+    
+    while(1) {
+
+         if(btState == 1) { // If the HC-05 is connected
+            offstate();
+        }else{
+            myRGBLED.write(1.0,0.0,0.0);
+            warning();
+        }
+        ThisThread::sleep_for(100ms); // Wait for 100 milliseconds before checking again
+    }
+}
